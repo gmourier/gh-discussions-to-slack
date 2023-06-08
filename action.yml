@@ -1,8 +1,5 @@
 name: 'GitHub Discussions Slack Notifier'
-description: 'Notify GitHub Discussion & Comment to Slack'
-branding:
-  icon: 'at-sign'
-  color: 'orange'
+description: 'Notify GitHub Discussion to Slack'
 
 inputs:
   SLACK_CHANNEL_ID:
@@ -11,14 +8,6 @@ inputs:
   SLACK_BOT_TOKEN:
     description: 'Slack Bot Token'
     required: true
-  send-discussion-create:
-    description: 'send discussion create notification?'
-    required: false
-    default: true
-  send-discussion-comment:
-    description: 'send discussion comment notification?'
-    required: false
-    default: true
   unfurl-links:
     description: 'Pass true to enable unfurling of primarily text-based content.'
     required: false
@@ -32,7 +21,7 @@ runs:
   using: "composite"
   steps:
     - name: Send GitHub Discussion Notification to a Slack channel
-      if: ${{ github.event.discussion && !github.event.comment && inputs.send-discussion-create }}
+      if: ${{ github.event.discussion && !github.event.comment }}
       # Note:
       # - 一度変数に入れることで、$や`をエスケープしている
       # - https://stackoverflow.com/questions/69982822/is-there-a-way-to-escape-and-single-quotes-together-in-bash
@@ -84,52 +73,4 @@ runs:
         DISCUSSION_TITLE: ${{ github.event.discussion.title }}
         DISCUSSION_BODY: ${{ github.event.discussion.body }}
         USER_URL: ${{ github.event.discussion.user.html_url }}
-        USER_NAME: ${{ github.event.discussion.user.login }}
-    - name: Send GitHub Discussions Comment Notification to Slack
-      if: ${{ github.event.comment && inputs.send-discussion-comment }}
-      run: |
-        title=$(cat << "EOF"
-        ${{ env.DISCUSSION_TITLE }}
-        EOF
-        )
-        body=$(cat << "EOF"
-        ${{ env.COMMENT_BODY }}
-        EOF
-        )
-        printf -v markdown_message_unescaped %b "*<${{ env.COMMENT_URL }}|Comment on $title>*\n$body"
-        jq -n -r --arg text "$markdown_message_unescaped" '{
-          "token":"${{ inputs.SLACK_BOT_TOKEN }}",
-          "channel":"${{ inputs.SLACK_CHANNEL_ID }}",
-          "blocks":[
-            {
-              "type":"section",
-              "text":{
-                "type":"mrkdwn",
-                "text":"New comment by <${{ env.USER_URL }}|${{ env.USER_NAME }}> on ${{ env.DISCUSSION_TITLE }}"
-              }
-            }
-          ],
-          "attachments":[
-            {
-              "blocks":[
-                {
-                  "type":"section",
-                  "text":{
-                    "type":"mrkdwn",
-                    "text":$text
-                  }
-                }
-              ]
-            }
-          ],
-          "unfurl_links": ${{ inputs.unfurl-links }},
-          "unfurl_media": ${{ inputs.unfurl-media }}
-        }
-        '|curl -X POST -H 'Authorization: Bearer ${{ inputs.SLACK_BOT_TOKEN }}' -H "Content-Type: application/json" -d @- https://slack.com/api/chat.postMessage
-      shell: bash
-      env:
-        DISCUSSION_TITLE: ${{ github.event.discussion.title }}
-        COMMENT_URL: ${{ github.event.comment.html_url }}
-        COMMENT_BODY: ${{ github.event.comment.body }}
-        USER_URL: ${{ github.event.comment.user.html_url }}
-        USER_NAME: ${{ github.event.comment.user.login }}
+        USER_NAME: ${{ github.event.discussion.user.login }
